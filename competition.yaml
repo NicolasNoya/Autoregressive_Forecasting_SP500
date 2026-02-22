@@ -1,8 +1,26 @@
 version: 2
-title: Templat competition - Dummy classification
-description: Dummy classification task
+title: "Autoregressive Forecasting of the S&P 500 Index"
+description: >
+  Can you predict whether the S&P 500 will close up or down — using only what you know by mid-morning?
+
+  Each trading day, participants receive a feature vector built from:
+    - Intraday morning signals: the day's open price and early price action
+      (e.g. open-to-first-hour return, morning high/low range, opening gap vs previous close).
+    - Historical context: past N days of daily OHLCV data, log-returns, and
+      rolling statistics (volatility, momentum) up to and including the previous close.
+
+  The target label is binary: **1** if the day's close is strictly above the previous close,
+  **0** otherwise. No look-ahead is permitted — only information available before noon (ET)
+  may be used as features for the current day.
+
+  Participants submit a scikit-learn–compatible model via a `submission.py` file
+  exposing a `get_model()` function. The model is trained server-side on historical
+  data and evaluated on a held-out test window using **directional accuracy**
+  (fraction of days where the predicted direction matches the actual close direction).
+
+  This is a DataCamp challenge organised at École Polytechnique (INF554 / MAP583).
 image: logo.png
-registration_auto_approve: False  # if True, do not require approval from admin to join the comp
+registration_auto_approve: False  # set to True to skip manual approval
 
 terms: pages/terms.md
 pages:
@@ -15,8 +33,15 @@ pages:
 
 tasks:
   - index: 0
-    name: Developement Task
-    description: 'Tune models with training data, test against examples contained in public test data'
+    name: Development Task
+    description: >
+      Same-day close direction forecasting of the S&P 500 using morning information.
+      Each sample consists of: (i) intraday morning features for the current trading day
+      (opening gap, open price, early price action) and (ii) historical daily features
+      from the past N sessions (log-returns, OHLCV, rolling volatility, momentum).
+      The label is 1 if today's close > previous close, 0 otherwise.
+      No information after the morning window may be used; models are scored on
+      directional accuracy over a public held-out test window.
     input_data: dev_phase/input_data/
     reference_data: dev_phase/reference_data/
     ingestion_program: ingestion_program/
@@ -25,13 +50,15 @@ tasks:
 solutions:
   - index: 0
     tasks:
-    - 0
+      - 0
     path: solution/
-
 
 phases:
   - name: Development Phase
-    description: 'Development phase: tune your models.'
+    description: >
+      Tune and validate your autoregressive model using the provided historical
+      S&P 500 training data. Your predictions are scored against a public test set
+      so you can iterate quickly. Unlimited submissions are allowed in this phase.
     start: 10-07-2025
     end: 03-31-2026
     tasks:
@@ -41,20 +68,20 @@ leaderboards:
   - title: Results
     key: main
     columns:
-      - title: Test Accuracy
+      - title: Directional Accuracy (public test)
         key: test
         index: 0
-        sorting: asc
-      - title: Private Test Accuracy
+        sorting: desc          # higher is better
+      - title: Directional Accuracy (private test)
         key: private_test
         index: 1
-        sorting: asc
-        hidden: True
-      - title: Train time
+        sorting: desc
+        hidden: True           # revealed only after the phase ends
+      - title: Train Time (s)
         key: train_time
         index: 2
-        sorting: desc
-      - title: Test time
+        sorting: asc           # lower is better
+      - title: Predict Time (s)
         key: test_time
         index: 3
-        sorting: desc
+        sorting: asc

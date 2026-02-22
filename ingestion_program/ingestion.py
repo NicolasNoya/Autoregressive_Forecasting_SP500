@@ -3,53 +3,156 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+import torch
 
+# Number of past trading days fed as a sequence to the model.
+# Must be consistent between training and inference.
+WINDOW_SIZE = 50
 
 EVAL_SETS = ["test", "private_test"]
 
 
-def evaluate_model(model, X_test):
+class SP500Dataset(torch.utils.data.Dataset):
+    """PyTorch Dataset for the S&P 500 direction-forecasting challenge.
 
-    y_pred = model.predict(X_test)
-    return pd.DataFrame(y_pred)
+    Each sample is a sliding window of shape (WINDOW_SIZE, n_features)
+    ending at day `idx`. The target is the binary label of that last day
+    (1 = close > prev_close, 0 otherwise).
+
+    For the first WINDOW_SIZE-1 days, the window is left-padded with zeros.
+
+    Parameters
+    ----------
+    features_path : Path
+        Path to the features CSV (columns = feature names, rows = trading days
+        in chronological order).
+    labels_path : Path or None
+        Path to the labels CSV (single column, same row order as features).
+        Pass None for test sets where labels are withheld.
+    window_size : int
+        Number of past days (inclusive of the current day) in each sequence.
+    """
+
+    def __init__(
+        self, features_path, labels_path=None, window_size=WINDOW_SIZE
+    ):
+        self.window_size = window_size
+        # index_col=0: the first column is the row index saved by setup_data.py,
+        # not a feature — must be excluded from the data arrays.
+        self.X = pd.read_csv(features_path, index_col=0).values.astype(
+            np.float32
+        )
+        self.n_features = self.X.shape[1]
+        if labels_path is not None:
+            self.y = (
+                pd.read_csv(labels_path, index_col=0)
+                .values.astype(np.float32)
+                .ravel()
+            )
+        else:
+            self.y = None  # test mode — labels are unknown
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        """Return (window, label) where window has shape (window_size, n_features).
+
+        The label is the binary target for day `idx` (the last day of the window).
+        During test mode (no labels), only the window tensor is returned.
+        """
+        window_start = max(0, idx - self.window_size + 1)
+        window = self.X[window_start : idx + 1]  # (<=window_size, n_features)
+
+        # Left-pad with zeros if we are at the beginning of the series
+        if len(window) < self.window_size:
+            padding = np.zeros(
+                (self.window_size - len(window), self.n_features),
+                dtype=np.float32,
+            )
+            window = np.concatenate([padding, window], axis=0)
+
+        x = torch.tensor(
+            window, dtype=torch.float32
+        )  # (window_size, n_features)
+
+        if self.y is not None:
+            y = torch.tensor(self.y[idx], dtype=torch.float32)  # scalar
+            return x, y
+        return x  # test mode
 
 
-def get_train_data(data_dir):
+def get_train_dataset(data_dir):
+    """Build the training Dataset from separate features and labels CSVs."""
     data_dir = Path(data_dir)
-    training_dir = data_dir / "train"
-    X_train = pd.read_csv(training_dir / "train_features.csv")
-    y_train = pd.read_csv(training_dir / "train_labels.csv")
-    return X_train, y_train
+    features_path = data_dir / "train" / "train_features.csv"
+    labels_path = data_dir / "train" / "train_labels.csv"
+    return SP500Dataset(features_path, labels_path)
+
+
+def get_test_dataset(data_dir, eval_set):
+    """Build a test Dataset (no labels) for a given evaluation split."""
+    data_dir = Path(data_dir)
+    features_path = data_dir / eval_set / f"{eval_set}_features.csv"
+    return SP500Dataset(features_path, labels_path=None)
+
+
+def evaluate_model(model, test_dataset):
+    """Run inference over a test Dataset and return a DataFrame of probabilities.
+
+    The model outputs probabilities in [0, 1] (sigmoid already applied).
+    The scoring program is responsible for applying the decision threshold.
+    """
+    device = next(model.parameters()).device
+    loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=64, shuffle=False
+    )
+    probs = []
+    model.eval()
+    with torch.no_grad():
+        for x in loader:
+            # test_dataset returns bare tensors (no label) — x is already the input
+            x = x.to(device)
+            batch_probs = model(x).cpu().numpy().tolist()  # floats in [0, 1]
+            probs.extend(batch_probs)
+    return pd.DataFrame({"Probability": probs})
 
 
 def main(data_dir, output_dir):
-    # Here, you can import info from the submission module, to evaluate the
-    # submission
-    from submission import get_model
+    from submission import (
+        get_model,
+    )  # imported here so sys.path is set first
 
-    X_train, y_train = get_train_data(data_dir)
+    data_dir = Path(data_dir)
+    output_dir = Path(output_dir)
+
+    # ── Training ──────────────────────────────────────────────────────────────
+    train_dataset = get_train_dataset(data_dir)
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=32, shuffle=True
+    )
 
     print("Training the model")
-
-    model = get_model()
-
     start = time.time()
-    model.fit(X_train, y_train)
+    model = get_model(train_loader)  # participant trains and returns the model
     train_time = time.time() - start
-    print("-" * 10)
+
+    # ── Evaluation ────────────────────────────────────────────────────────────
+    print("=" * 40)
     print("Evaluate the model")
     start = time.time()
     res = {}
     for eval_set in EVAL_SETS:
-        X_test = pd.read_csv(data_dir / eval_set / f"{eval_set}_features.csv")
-        res[eval_set] = evaluate_model(model, X_test)
+        test_dataset = get_test_dataset(data_dir, eval_set)
+        res[eval_set] = evaluate_model(model, test_dataset)
     test_time = time.time() - start
-    print("-" * 10)
-    duration = train_time + test_time
-    print(f"Completed Prediction. Total duration: {duration}")
+    print(
+        f"Completed Prediction. Total duration: {train_time + test_time:.1f}s"
+    )
 
-    # Write output files
+    # ── Write outputs ─────────────────────────────────────────────────────────
     output_dir.mkdir(parents=True, exist_ok=True)
     with open(output_dir / "metadata.json", "w+") as f:
         json.dump(dict(train_time=train_time, test_time=test_time), f)
@@ -69,19 +172,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data-dir",
         type=str,
-        default="/app/input_data",
-        help="",
+        default="dev_phase/input_data",
+        help="Root folder containing train/, test/, and private_test/ splits.",
     )
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="/app/output",
-        help="",
+        default="ingestion_res",
+        help="Folder where prediction CSVs and metadata.json will be written.",
     )
     parser.add_argument(
         "--submission-dir",
         type=str,
-        default="/app/ingested_program",
+        default="solution",
         help="",
     )
 

@@ -14,7 +14,7 @@ TARGET_COL = "Target"
 
 def make_csv(data, filepath):
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    data.to_csv(filepath, index=False)
+    data.to_csv(filepath, index=True)  # integer row index saved as first column
 
 
 if __name__ == "__main__":
@@ -23,9 +23,9 @@ if __name__ == "__main__":
     print(f"Loading data from {RAW_DATA_PATH}")
     df = pd.read_csv(RAW_DATA_PATH)
 
-    # Separate features and target
+    # Separate features and target; drop Date (not a model input)
     y = df[TARGET_COL]
-    X = df.drop(columns=[TARGET_COL])
+    X = df.drop(columns=[TARGET_COL, "Date"]).reset_index(drop=True)
 
     n = len(df)
     train_end = int(n * 0.6)
@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
     print("\nData splits created successfully!")
     print(
-        f"{'Split':<15} {'Samples':<10} {'First Date':<15} {'Last Date':<15}"
+        f"{'Split':<15} {'Samples':<10} {'Index start':<15} {'Index end':<15}"
     )
     print("-" * 55)
     for split, X_split in [
@@ -67,8 +67,6 @@ if __name__ == "__main__":
         ("test", X_test),
         ("private_test", X_private_test),
     ]:
-        first_date = X_split["Date"].iloc[0]
-        last_date = X_split["Date"].iloc[-1]
         print(
-            f"{split:<15} {len(X_split):<10} {first_date:<15} {last_date:<15}"
+            f"{split:<15} {len(X_split):<10} {X_split.index[0]:<15} {X_split.index[-1]:<15}"
         )
