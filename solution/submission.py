@@ -1,7 +1,5 @@
-from sklearn.ensemble import RandomForestClassifier
+import torch
 
-
-# The submission here should simply be a function that returns a model
-# compatible with scikit-learn API
 def get_model():
-    return RandomForestClassifier()
+    
+
