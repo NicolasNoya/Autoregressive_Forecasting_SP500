@@ -172,20 +172,26 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data-dir",
         type=str,
-        default="dev_phase/input_data",
-        help="Root folder containing train/, test/, and private_test/ splits.",
+        default="/app/input_data",
+        help="Root folder containing train/, test/, and private_test/ splits. "
+        "Codabench mounts data at /app/input_data. "
+        "For local testing pass: --data-dir dev_phase/input_data",
     )
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="ingestion_res",
-        help="Folder where prediction CSVs and metadata.json will be written.",
+        default="/app/output",
+        help="Folder where prediction CSVs and metadata.json will be written. "
+        "Codabench expects output at /app/output. "
+        "For local testing pass: --output-dir ingestion_res",
     )
     parser.add_argument(
         "--submission-dir",
         type=str,
-        default="solution",
-        help="",
+        default="/app/ingested_program",
+        help="Directory containing submission.py. "
+        "Codabench mounts participant code at /app/ingested_program. "
+        "For local testing pass: --submission-dir solution",
     )
 
     args = parser.parse_args()
