@@ -1,10 +1,55 @@
-# How to participate
+# How to Participate
 
-You should submit an untrained model in a python file `model.py` which contains
-your `class Model`, which will be imported, trained, and tested on Codalab.
+## Objective
 
-See the "Seed" page for the outline of a `Model` class, with the expected
-function names.
+Build a model that predicts whether the S&P 500 index will **close higher or lower** than the previous day,
+using only information available before noon (ET) on the trading day in question.
 
-See the "Timeline" page for additional information about the phases of this
-competition
+## Input Features
+
+Each sample in the dataset is a row in a CSV with the following columns (all values are for the **current trading day** or computed from past days only):
+
+| Column | Description |
+|--------|-------------|
+| `Open` | Opening price of the current trading day |
+| `High` | Intraday high up to the morning window |
+| `Low` | Intraday low up to the morning window |
+| `Close` | Previous day's closing price |
+| `Volume` | Trading volume up to the morning window |
+
+The ingestion program constructs **sliding windows** of the last 20 trading days for each sample and feeds them to your model as tensors of shape `(batch, 20, n_features)`.
+
+## Target Label
+
+- **1** — today's close will be **strictly above** the previous close
+- **0** — today's close will be **at or below** the previous close
+
+## What to Submit
+
+Submit a single file named **`submission.py`** containing a function:
+
+```python
+def get_model(train_loader):
+    ...
+    return model
+```
+
+`train_loader` is a `torch.utils.data.DataLoader` yielding `(x, y)` batches where:
+- `x` has shape `(batch, 20, n_features)` — a sequence of 20 daily feature vectors
+- `y` has shape `(batch,)` — binary labels `{0, 1}`
+
+Your `get_model` function must **train the model** using the provided loader and return a trained `torch.nn.Module` whose `forward(x)` outputs **probabilities in [0, 1]** of shape `(batch,)` — i.e. sigmoid must already be applied.
+
+See the **Seed** page for a working skeleton to get started.
+
+## Evaluation Metric
+
+Submissions are ranked by **ROC-AUC score** on the held-out test set.
+A perfect model scores 1.0; random guessing scores ~0.5.
+
+## Rules
+
+- Your model may only use information in the provided feature set — no external data sources.
+- External Python libraries (e.g. `torch`, `sklearn`, `numpy`) are allowed.
+- You may submit as many times as you like during the Development Phase.
+- The private test set is only revealed after the phase ends.
