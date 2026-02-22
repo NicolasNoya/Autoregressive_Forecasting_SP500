@@ -11,7 +11,7 @@ def compute_roc_auc(predictions, targets):
     # Make sure there is no NaN
     predictions = predictions.fillna(0.5).values
     # Return ROC AUC score
-    return roc_auc_score(targets.values, predictions)
+    return roc_auc_score(targets, predictions)
 
 
 def main(reference_dir, prediction_dir, output_dir):
@@ -24,7 +24,9 @@ def main(reference_dir, prediction_dir, output_dir):
         )
         targets = pd.read_csv(reference_dir / f"{eval_set}_labels.csv")
 
-        scores[eval_set] = float(compute_roc_auc(predictions, targets))
+        scores[eval_set] = float(
+            compute_roc_auc(predictions, targets["Target"].values)
+        )
 
     # Add train and test times in the score
     json_durations = (prediction_dir / "metadata.json").read_text()
