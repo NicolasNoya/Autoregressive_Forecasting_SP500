@@ -1,26 +1,29 @@
 version: 2
-title: "Autoregressive Forecasting of the S&P 500 Index"
+title: "Directional Forecasting of the S&P 500 Index"
 description: >
-  Can you predict whether the S&P 500 will close up or down — using only what you know by mid-morning?
+  Can you predict whether the S&P 500 will close UP or DOWN tomorrow?
 
-  Each trading day, participants receive a feature vector built from:
-    - Intraday morning signals: the day's open price and early price action
-      (e.g. open-to-first-hour return, morning high/low range, opening gap vs previous close).
-    - Historical context: past N days of daily OHLCV data, log-returns, and
-      rolling statistics (volatility, momentum) up to and including the previous close.
+  Each trading day, participants receive a historical feature vector built from
+  past daily OHLCV data (Open, High, Low, Close, Volume) of the S&P 500 index.
 
-  The target label is binary: **1** if the day's close is strictly above the previous close,
-  **0** otherwise. No look-ahead is permitted — only information available before noon (ET)
-  may be used as features for the current day.
+  The target label is binary: **1** if the next trading day's close is strictly
+  above the current day's close, **0** otherwise. Participants are encouraged to
+  engineer their own historical context features (e.g., rolling volatility, moving averages)
+  using the provided sequential data.
 
-  Participants submit a scikit-learn–compatible model via a `submission.py` file
-  exposing a `get_model()` function. The model is trained server-side on historical
-  data and evaluated on a held-out test window using **directional accuracy**
-  (fraction of days where the predicted direction matches the actual close direction).
+  Participants submit a PyTorch model via a `submission.py` file exposing a `get_model(train_loader)`
+  function. The ingestion program passes a `DataLoader` yielding `(x, y)` batches where:
+    - `x` is a `FloatTensor` of shape `(batch, WINDOW_SIZE, n_features)` — a sliding window of historical daily features
+    - `y` is a `FloatTensor` of shape `(batch,)` — binary labels (1 = up, 0 = down)
+
+  `get_model` must return a trained `torch.nn.Module` whose forward pass accepts a tensor of
+  shape `(batch, WINDOW_SIZE, n_features)` and returns **probabilities in [0, 1]** of shape `(batch,)`.
+
+  Submissions are ranked by their **ROC-AUC** score computed from the predicted probabilities.
 
   This is a DataCamp challenge organised at École Polytechnique (INF554 / MAP583).
 image: logo.png
-registration_auto_approve: False  # set to True to skip manual approval
+registration_auto_approve: False
 
 terms: pages/terms.md
 pages:
@@ -35,13 +38,9 @@ tasks:
   - index: 0
     name: Development Task
     description: >
-      Same-day close direction forecasting of the S&P 500 using morning information.
-      Each sample consists of: (i) intraday morning features for the current trading day
-      (opening gap, open price, early price action) and (ii) historical daily features
-      from the past N sessions (log-returns, OHLCV, rolling volatility, momentum).
-      The label is 1 if today's close > previous close, 0 otherwise.
-      No information after the morning window may be used; models are scored on
-      directional accuracy over a public held-out test window.
+      Next-day close direction forecasting of the S&P 500 using sliding windows of daily OHLCV data.
+      Models must be PyTorch modules trained via `get_model(train_loader)` and must output
+      probabilities (not hard 0s and 1s) to be properly scored via ROC-AUC over a public held-out test window.
     input_data: dev_phase/input_data/
     reference_data: dev_phase/reference_data/
     ingestion_program: ingestion_program/
@@ -56,7 +55,7 @@ solutions:
 phases:
   - name: Development Phase
     description: >
-      Tune and validate your autoregressive model using the provided historical
+      Tune and validate your forecasting model using the provided historical
       S&P 500 training data. Your predictions are scored against a public test set
       so you can iterate quickly. Unlimited submissions are allowed in this phase.
     start: 10-07-2025
@@ -68,11 +67,11 @@ leaderboards:
   - title: Results
     key: main
     columns:
-      - title: Directional Accuracy (public test)
+      - title: ROC-AUC (public test)
         key: test
         index: 0
         sorting: desc          # higher is better
-      - title: Directional Accuracy (private test)
+      - title: ROC-AUC (private test)
         key: private_test
         index: 1
         sorting: desc
