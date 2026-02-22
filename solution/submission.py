@@ -11,8 +11,8 @@ where `train_loader` is a torch.utils.data.DataLoader that yields
     y : FloatTensor of shape (batch,)  — binary labels (1 = up, 0 = down)
 
 `get_model` must return a trained torch.nn.Module whose forward pass accepts
-a tensor of shape (batch, WINDOW_SIZE, n_features) and returns raw logits of
-shape (batch,). The ingestion program applies sigmoid + 0.5 threshold itself.
+a tensor of shape (batch, WINDOW_SIZE, n_features) and returns probabilities
+in [0, 1] of shape (batch,). The ingestion program applies a 0.5 threshold.
 """
 
 import torch
@@ -20,11 +20,11 @@ import torch.nn as nn
 
 
 # ── Hyper-parameters (feel free to tune) ─────────────────────────────────────
-HIDDEN_SIZE = 64
-NUM_LAYERS = 2
-DROPOUT = 0.2
-N_EPOCHS = 20
-LEARNING_RATE = 1e-3
+HIDDEN_SIZE = 128
+NUM_LAYERS = 3
+DROPOUT = 0.1
+N_EPOCHS = 3
+LEARNING_RATE = 1e-4
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -37,7 +37,7 @@ class LSTMClassifier(nn.Module):
     Architecture
     ------------
     LSTM (num_layers, hidden_size, dropout) → hidden state of last timestep
-    → Linear(hidden_size → 1) → squeeze → logit
+    → Linear(hidden_size → 1) → squeeze → Sigmoid → probability in [0, 1]
     """
 
     def __init__(
@@ -60,8 +60,9 @@ class LSTMClassifier(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (batch, seq_len, input_size)
         out, _ = self.lstm(x)  # (batch, seq_len, hidden_size)
-        last = out[:, -1, :]  # (batch, hidden_size)  — last timestep
-        return self.head(last).squeeze(-1)  # (batch,)
+        last = out[:, -1, :]  # (batch, hidden_size) — last timestep
+        logit = self.head(last).squeeze(-1)  # (batch,)
+        return torch.sigmoid(logit)  # (batch,) — probability in [0, 1]
 
 
 def get_model(train_loader: torch.utils.data.DataLoader) -> nn.Module:
@@ -76,7 +77,7 @@ def get_model(train_loader: torch.utils.data.DataLoader) -> nn.Module:
     Returns
     -------
     model : nn.Module (in eval mode)
-        Trained LSTMClassifier whose forward pass returns raw logits.
+        Trained LSTMClassifier whose forward pass returns probabilities in [0, 1].
     """
     # Infer input size from the first batch
     x_sample, _ = next(iter(train_loader))
@@ -87,7 +88,7 @@ def get_model(train_loader: torch.utils.data.DataLoader) -> nn.Module:
 
     model = LSTMClassifier(input_size=input_size).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCELoss()  # model already applies sigmoid
 
     model.train()
     for epoch in range(N_EPOCHS):
@@ -95,8 +96,8 @@ def get_model(train_loader: torch.utils.data.DataLoader) -> nn.Module:
         for x, y in train_loader:
             x, y = x.to(device), y.to(device)
             optimizer.zero_grad()
-            logits = model(x)  # (batch,)
-            loss = criterion(logits, y)
+            probs = model(x)  # (batch,) — probabilities in [0, 1]
+            loss = criterion(probs, y)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()

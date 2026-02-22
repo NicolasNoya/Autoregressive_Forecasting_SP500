@@ -9,7 +9,7 @@ import torch
 
 # Number of past trading days fed as a sequence to the model.
 # Must be consistent between training and inference.
-WINDOW_SIZE = 20
+WINDOW_SIZE = 50
 
 EVAL_SETS = ["test", "private_test"]
 
@@ -39,10 +39,18 @@ class SP500Dataset(torch.utils.data.Dataset):
         self, features_path, labels_path=None, window_size=WINDOW_SIZE
     ):
         self.window_size = window_size
-        self.X = pd.read_csv(features_path).values.astype(np.float32)
+        # index_col=0: the first column is the row index saved by setup_data.py,
+        # not a feature — must be excluded from the data arrays.
+        self.X = pd.read_csv(features_path, index_col=0).values.astype(
+            np.float32
+        )
         self.n_features = self.X.shape[1]
         if labels_path is not None:
-            self.y = pd.read_csv(labels_path).values.astype(np.float32).ravel()
+            self.y = (
+                pd.read_csv(labels_path, index_col=0)
+                .values.astype(np.float32)
+                .ravel()
+            )
         else:
             self.y = None  # test mode — labels are unknown
 
@@ -92,30 +100,30 @@ def get_test_dataset(data_dir, eval_set):
 
 
 def evaluate_model(model, test_dataset):
-    """Run inference over a test Dataset and return a DataFrame of 0/1 predictions.
+    """Run inference over a test Dataset and return a DataFrame of probabilities.
 
-    The model is expected to output raw logits (one scalar per sample).
-    Predictions are thresholded at 0.5 after applying sigmoid.
+    The model outputs probabilities in [0, 1] (sigmoid already applied).
+    The scoring program is responsible for applying the decision threshold.
     """
     device = next(model.parameters()).device
     loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=64, shuffle=False
     )
-    preds = []
+    probs = []
     model.eval()
     with torch.no_grad():
         for x in loader:
             # test_dataset returns bare tensors (no label) — x is already the input
             x = x.to(device)
-            logits = model(x)  # (batch,)
-            probs = torch.sigmoid(logits)
-            batch_preds = (probs >= 0.5).long().cpu().numpy().tolist()
-            preds.extend(batch_preds)
-    return pd.DataFrame({"Prediction": preds})
+            batch_probs = model(x).cpu().numpy().tolist()  # floats in [0, 1]
+            probs.extend(batch_probs)
+    return pd.DataFrame({"Probability": probs})
 
 
 def main(data_dir, output_dir):
-    from submission import get_model  # imported here so sys.path is set first
+    from submission import (
+        get_model,
+    )  # imported here so sys.path is set first
 
     data_dir = Path(data_dir)
     output_dir = Path(output_dir)
@@ -164,19 +172,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data-dir",
         type=str,
-        default="/app/input_data",
-        help="",
+        default="dev_phase/input_data",
+        help="Root folder containing train/, test/, and private_test/ splits.",
     )
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="/app/output",
-        help="",
+        default="ingestion_res",
+        help="Folder where prediction CSVs and metadata.json will be written.",
     )
     parser.add_argument(
         "--submission-dir",
         type=str,
-        default="/app/ingested_program",
+        default="solution",
         help="",
     )
 
