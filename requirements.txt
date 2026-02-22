@@ -1,2 +1,11 @@
-pandas
-scikit-learn
+# ── Core runtime (ingestion + scoring + submission) ───────────────────────────
+numpy==2.2.6
+pandas==2.3.3
+scikit-learn==1.7.2
+
+# PyTorch CPU build — participants may swap for a GPU wheel if needed
+torch==2.8.0
+
+# ── Local development tools ───────────────────────────────────────────────────
+# Required only for tools/run_docker.py (not installed inside the Docker image)
+docker
