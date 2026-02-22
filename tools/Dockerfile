@@ -1,22 +1,45 @@
-# Step 1: Start from an official PyTorch + GPU base image
-# (Ubuntu 22.04, Python 3.11, PyTorch, CUDA 12.6, torch 2.8)
-FROM pytorch/pytorch:2.8.0-cuda12.6-cudnn9-runtime
+# ─────────────────────────────────────────────────────────────────────────────
+# Codabench Docker image — S&P 500 Autoregressive Forecasting Challenge
+#
+# Codabench mounts the following directories at runtime:
+#   /app/input_data        ← input splits (train/, test/, private_test/)
+#   /app/ingested_program  ← participant's submission.py
+#   /app/ingestion_program ← ingestion.py (organiser code)
+#   /app/scoring_program   ← scoring.py   (organiser code)
+#   /app/output            ← ingestion writes predictions here
+#   /app/input/ref         ← reference labels (scoring)
+#   /app/input/res         ← predictions to score (scoring)
+#
+# Build from the PROJECT ROOT, not from tools/:
+#   docker build -t sp500-challenge -f tools/Dockerfile .
+#
+# The build context must be the project root so that requirements.txt is
+# accessible via COPY.
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Set environment variables to prevent interactive prompts
-ENV DEBIAN_FRONTEND=noninteractive
+FROM python:3.11-slim
 
-# Step 2: Install system-level dependencies (if any)
-# e.g., git, wget, or common libraries for OpenCV like libgl1
-RUN apt-get update && apt-get install -y \
-    git \
-    wget \
-    libgl1-mesa-glx \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install -U pip
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Step 3: Copy and pre-install all Python dependencies
-# This 'requirements.txt' file should list pandas, scikit-learn, timm, etc.
-# Place it in the same directory as this Dockerfile.
+# Minimal system deps: gcc is needed to compile some numpy/pandas C extensions
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Pre-install Python dependencies.
+# The 'docker' package is a local dev tool — skip it inside the container.
+# torch is installed from the official CPU wheel index to avoid pulling the
+# full CUDA build (~2 GB saved).
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
-RUN pip install opencv-python-headless
+RUN pip install --no-cache-dir --upgrade pip \
+ && grep -v "^docker" /tmp/requirements.txt \
+    | grep -v "^#" \
+    | grep -v "^$" \
+    | grep -v "torch" \
+    | pip install --no-cache-dir -r /dev/stdin \
+ && pip install --no-cache-dir \
+        torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
