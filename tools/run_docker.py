@@ -1,4 +1,5 @@
 from pathlib import Path
+
 try:
     import docker
 except ImportError:
@@ -14,12 +15,18 @@ if __name__ == "__main__":
     print("Docker client initialized successfully.")
 
     print("Building Docker image...")
-    client.images.build(path=".", tag="tommoral/template:v1")
-    print("Docker image built successfully with tag 'tommoral/template:v1'.")
+    client.images.build(
+        path=str(REPO),
+        dockerfile=str(REPO / "tools" / "Dockerfile"),
+        tag="nicolasnoya2001/sp500-challenge:latest",
+    )
+    print(
+        "Docker image built successfully with tag 'nicolasnoya2001/sp500-challenge:latest'."
+    )
 
     print("Running Docker container...")
     logs = client.containers.run(
-        image="tommoral/template:v1",
+        image="nicolasnoya2001/sp500-challenge:latest",
         command="python3 /app/ingestion_program/ingestion.py",
         remove=True,
         name="ingestion",
@@ -29,11 +36,11 @@ if __name__ == "__main__":
             f"{REPO}/dev_phase/input_data:/app/input_data",
             f"{REPO}/ingestion_res:/app/output",
             f"{REPO}/solution:/app/ingested_program",
-        ]
+        ],
     )
     print(logs.decode("utf-8"))
     logs = client.containers.run(
-        image="tommoral/template:v1",
+        image="nicolasnoya2001/sp500-challenge:latest",
         command="python3 /app/scoring_program/scoring.py",
         remove=True,
         name="scoring",
@@ -43,7 +50,7 @@ if __name__ == "__main__":
             f"{REPO}/dev_phase/reference_data:/app/input/ref",
             f"{REPO}/ingestion_res:/app/input/res",
             f"{REPO}/scoring_res:/app/",
-        ]
+        ],
     )
     print(logs.decode("utf-8"))
     print("Docker container ran successfully.")
