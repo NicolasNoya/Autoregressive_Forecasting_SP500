@@ -45,6 +45,12 @@ tasks:
     reference_data: dev_phase/reference_data/
     ingestion_program: ingestion_program/
     scoring_program: scoring_program/
+    # Docker image used by Codabench to run ingestion and scoring.
+    # Build and push with:
+    #   docker build -t <your-dockerhub-username>/sp500-challenge:latest -f tools/Dockerfile .
+    #   docker push <your-dockerhub-username>/sp500-challenge:latest
+    # Then replace the placeholder below with your actual image name.
+    docker_image: nicolasnoya2001/sp500-challenge:latest
 
 solutions:
   - index: 0

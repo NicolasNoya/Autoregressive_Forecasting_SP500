@@ -8,10 +8,10 @@ EVAL_SETS = ["test", "private_test"]
 
 
 def compute_roc_auc(predictions, targets):
-    # Make sure there is no NaN
-    predictions = predictions.fillna(0.5).values
+    # Flatten to 1D — .values on a single-column DataFrame gives shape (n, 1)
+    preds = predictions.iloc[:, 0].fillna(0.5).to_numpy()
     # Return ROC AUC score
-    return roc_auc_score(targets, predictions)
+    return roc_auc_score(targets, preds)
 
 
 def main(reference_dir, prediction_dir, output_dir):
