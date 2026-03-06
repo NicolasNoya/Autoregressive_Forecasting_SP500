@@ -16,8 +16,7 @@ Once the development phase closes on **March 31, 2026**, the private test set
 (a further ~250 trading days, ~2023–2024) is scored for all submissions.
 Final rankings are based on the **private test ROC-AUC**.
 
-The private test set is completely hidden during the development phase — optimising
-sole ly for the public leaderboard may not generalise.
+The private test set is completely hidden during the development phase — optimising solely for the public leaderboard may not generalise.
 
 ## Key Dates
 

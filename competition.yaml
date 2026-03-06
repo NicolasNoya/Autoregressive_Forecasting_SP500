@@ -45,6 +45,8 @@ tasks:
     reference_data: dev_phase/reference_data/
     ingestion_program: ingestion_program/
     scoring_program: scoring_program/
+    public_data: dev_phase/input_data/train
+    starting_kit: template_starting_kit.ipynb
     # Docker image used by Codabench to run ingestion and scoring.
     # Build and push with:
     #   docker build -t <your-dockerhub-username>/sp500-challenge:latest -f tools/Dockerfile .

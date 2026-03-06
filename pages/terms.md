@@ -27,7 +27,7 @@ Participants must comply with the following rules:
 
 Participants must submit:
 
-    A compressed folder containing the code necessary to train a model (see page seed.md).
+    A single file named `submission.py` containing a `get_model(train_loader)` function, zipped as `submission.zip` (see the **Seed** page for a full working template).
     Any accompanying code or documentation as specified by the instructors.
 
 Submissions must be the original work of the participants.
