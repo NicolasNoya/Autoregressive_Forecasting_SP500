@@ -18,8 +18,8 @@ def get_model(train_loader):
     ----------
     train_loader : torch.utils.data.DataLoader
         Yields (x, y) batches where:
-          x — FloatTensor of shape (batch, 20, n_features)
-              A sliding window of the last 20 daily feature vectors.
+          x — FloatTensor of shape (batch, 50, n_features)
+              A sliding window of the last 50 daily feature vectors.
               Features: Open, High, Low, Close, Volume (current and past days).
           y — FloatTensor of shape (batch,)
               Binary label: 1 if today's close > previous close, else 0.
@@ -28,15 +28,15 @@ def get_model(train_loader):
     -------
     model : torch.nn.Module
         Trained model in eval() mode.
-        forward(x) must accept shape (batch, 20, n_features)
+        forward(x) must accept shape (batch, 50, n_features)
         and return probabilities in [0, 1] of shape (batch,).
-        The ingestion program applies a 0.5 threshold to produce 0/1 predictions.
+        Probabilities are used directly by the scoring program to compute ROC-AUC.
     """
 
     # --- Infer input size from the first batch ---
     x_sample, _ = next(iter(train_loader))
     input_size = x_sample.shape[-1]      # number of features per timestep
-    seq_len    = x_sample.shape[1]       # window size (20)
+    seq_len    = x_sample.shape[1]       # window size (50)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -80,6 +80,6 @@ def get_model(train_loader):
 ## Tips
 
 - You can replace the LSTM with a GRU (`nn.GRU`), Transformer (`nn.TransformerEncoder`), or any other architecture.
-- The window size is fixed at **20** timesteps by the ingestion program.
+- The window size is fixed at **50** timesteps by the ingestion program.
 - Keep training time reasonable — the Codabench environment has limited CPU resources.
 - You are free to add dropout, batch normalisation, learning rate schedulers, etc.

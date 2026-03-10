@@ -1,1 +1,2 @@
 command: python3 ingestion.py
+image: nicolasnoya2001/sp500-challenge:v2

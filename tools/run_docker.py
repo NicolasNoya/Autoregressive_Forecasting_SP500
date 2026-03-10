@@ -18,15 +18,15 @@ if __name__ == "__main__":
     client.images.build(
         path=str(REPO),
         dockerfile=str(REPO / "tools" / "Dockerfile"),
-        tag="nicolasnoya2001/sp500-challenge:latest",
+        tag="nicolasnoya2001/sp500-challenge:v2",
     )
     print(
-        "Docker image built successfully with tag 'nicolasnoya2001/sp500-challenge:latest'."
+        "Docker image built successfully with tag 'nicolasnoya2001/sp500-challenge:v2'."
     )
 
     print("Running Docker container...")
     logs = client.containers.run(
-        image="nicolasnoya2001/sp500-challenge:latest",
+        image="nicolasnoya2001/sp500-challenge:v2",
         command="python3 /app/ingestion_program/ingestion.py",
         remove=True,
         name="ingestion",
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     )
     print(logs.decode("utf-8"))
     logs = client.containers.run(
-        image="nicolasnoya2001/sp500-challenge:latest",
+        image="nicolasnoya2001/sp500-challenge:v2",
         command="python3 /app/scoring_program/scoring.py",
         remove=True,
         name="scoring",

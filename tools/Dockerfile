@@ -31,15 +31,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Pre-install Python dependencies.
-# The 'docker' package is a local dev tool — skip it inside the container.
-# torch is installed from the official CPU wheel index to avoid pulling the
-# full CUDA build (~2 GB saved).
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir --upgrade pip \
- && grep -v "^docker" /tmp/requirements.txt \
-    | grep -v "^#" \
-    | grep -v "^$" \
-    | grep -v "torch" \
-    | pip install --no-cache-dir -r /dev/stdin \
- && pip install --no-cache-dir \
-        torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+# torch is installed explicitly with the CPU-only wheel to keep the image small.
+# The 'docker' package is a local dev tool and is excluded from the container.
+RUN pip install --no-cache-dir --upgrade pip
+
+# Install torch CPU wheel first (separate layer so it's cached independently)
+# RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install remaining runtime deps (excluding torch and docker which are handled separately)
+RUN pip install --no-cache-dir numpy pandas scikit-learn
