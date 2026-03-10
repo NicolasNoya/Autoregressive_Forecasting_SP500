@@ -1,5 +1,10 @@
 version: 2
 title: "Directional Forecasting of the S&P 500 Index"
+# Docker image used by Codabench to run ingestion and scoring.
+# Build and push with:
+#   docker build -t nicolasnoya2001/sp500-challenge:v2 -f tools/Dockerfile .
+#   docker push nicolasnoya2001/sp500-challenge:v2
+docker_image: nicolasnoya2001/sp500-challenge:v2
 description: >
   Can you predict whether the S&P 500 will close UP or DOWN tomorrow?
 
@@ -47,12 +52,6 @@ tasks:
     scoring_program: scoring_program/
     public_data: dev_phase/input_data/train
     starting_kit: template_starting_kit.ipynb
-    # Docker image used by Codabench to run ingestion and scoring.
-    # Build and push with:
-    #   docker build -t <your-dockerhub-username>/sp500-challenge:latest -f tools/Dockerfile .
-    #   docker push <your-dockerhub-username>/sp500-challenge:latest
-    # Then replace the placeholder below with your actual image name.
-    docker_image: nicolasnoya2001/sp500-challenge:latest
 
 solutions:
   - index: 0
